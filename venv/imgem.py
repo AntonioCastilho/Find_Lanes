@@ -12,8 +12,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def make_coordinates(image, line_parameters):
+def make_coordinates(image, line_parameters, slop_prev=1, intercept_prev=1):
+
     slop, intercept = line_parameters
+
     y1 = image.shape[0]
     y2 = int(y1 * (3/5))
     x1 = int((y1 - intercept) / slop)
@@ -28,12 +30,16 @@ def average_slope_intercept(image, lines):
         x1, y1, x2, y2 = line.reshape(4)
         parameters = np.polyfit((x1, x2), (y1, y2), 1)
         slop = parameters[0]
+        print(slop)
+
         intercept = parameters[1]
+        print(intercept)
         if slop < 0:
             left_fit.append((slop, intercept))
         else:
             right_fit.append((slop, intercept))
     left_fit_average = np.average(left_fit, axis=0)
+
     right_shift_average = np.average(right_fit, axis=0)
     left_line = make_coordinates(image, left_fit_average)
     right_line = make_coordinates(image, right_shift_average)
@@ -62,7 +68,9 @@ def region_of_interest(image):
     ])
     mask = np.zeros_like(image)
     cv2.fillPoly(mask, poligons, 255)
+    cv2.imshow('mask', mask)
     mask_image = cv2.bitwise_and(image, mask)
+    cv2.imshow('mask', mask_image)
     return mask_image
 
 
@@ -78,20 +86,28 @@ def region_of_interest(image):
 # cv2.imshow('Mask', combo_image)
 # cv2.waitKey(0)
 
+
 video = 'test2.mp4'
 cap = cv2.VideoCapture(video)
+
 while(cap.isOpened()):
-    fr_true, frame = cap.read()
-    canny_img = canny(frame)
-    cropped_image = region_of_interest(canny_img)
-    lines = cv2.HoughLinesP(cropped_image, 2, np.pi/180, 100,
-                            np.array([]), minLineLength=40, maxLineGap=5)
-    averaged_lines = average_slope_intercept(frame, lines)
-    line_image = display_lines(frame, averaged_lines)
-    combo_image = cv2.addWeighted(frame, 0.8, line_image, 1, 1)
-    cv2.imshow(video, combo_image)
-    key = cv2.waitKey(20)
-    if key == ord('q'):
+    ret, frame = cap.read()
+    if ret == True:
+        canny_img = canny(frame)
+        cropped_image = region_of_interest(canny_img)
+        cv2.imshow('cropped', cropped_image)
+        # Hough transform
+        lines = cv2.HoughLinesP(cropped_image, 2, np.pi/180, 100, np.array([]), minLineLength=40, maxLineGap=5)
+        # Optimizing
+        averaged_lines = average_slope_intercept(frame, lines)
+        print(averaged_lines)
+        line_image = display_lines(frame, averaged_lines)
+        combo_image = cv2.addWeighted(frame, 0.8, line_image, 1, 1)
+        cv2.imshow(video, combo_image)
+        k = cv2.waitKey(1) & 0xff
+        if k == ord('q'):
+            break
+    else:
         break
 cap.release()
 cv2.destroyAllWindows()
